@@ -1,0 +1,273 @@
+---
+title: "Divvy bikes Case Study"
+author: "FJ"
+date: "2023-08-31"
+output:
+  html_document: default
+---
+
+```{r}
+knitr::opts_knit$set(root.dir = "C:/Users/Felip/OneDrive/Escritorio/Freelancer/Portfolio/7. Case study Bike - Sahere navigate speedy success/Data/Cleaned_data")
+```
+
+# Cyclistic_Exercise_Full_Year_Analysis
+
+This case study is about a bike-share company in Chicago called ***Cyclistic***. The director of Marketing believes that the company's futures success depends on maximizing the number of annual memberships. So the team want to understand how casual riders and annual members use **Cyclistic** bikes differently. From these insights, the marketing department would design a new strategy to convert casual riders into annual members.
+
+## Context
+
+Cyclistic offer the next options to their customers:
+
+-   Single-ride passes
+-   Full-day passes
+-   Annual memberships
+
+Customer who purchase single-ride or full-day passes are referred as *casual riders*. Customers who purchase annual membership are *Cyclsitic members.*The finance department conclude that annual members are much more profitable than casual riders. So the marketing's director believes that is easier to convert casual members into members, because casual riders are already aware of the company program and have chosen Cyclistic for their mobility needs.
+
+## Analysis
+
+This analysis look for answer the next questions:
+
+1.  How do annual members and casual riders use Cyclistic bikes differently?
+
+2.  Why would casual riders buy Cyclistic annual memberships?
+
+3.  How can Cyclistic use digital media to influence casual riders to become members?
+
+This information would help to marketing department planning the best strategy to
+
+### STEP 1: INSTALL REQUIRED PACKAGES & DATA
+
+For this analysis, we'll be using data from 2019 entire year, that previously was cleaned and combined using SQL Server. You can check this process here [SQL\_ script](https://github.com/felipejordan95/SQL-for-Data-Analysis/edit/main/Cyclistic_cleaning_data.sql)
+
+```{r}
+library(tidyverse)  #helps wrangle data
+library(lubridate)  #helps wrangle date attributes
+library(ggplot2)  #helps visualize data
+library(dplyr)
+```
+
+### STEP 2: LOADING DATA
+
+To start with the analysis, we have to set our working directory and read the CSV file with the data
+
+```{r}
+
+setwd("C:/Users/Felip/OneDrive/Escritorio/Freelancer/Portfolio/7. Case study Bike - Sahere navigate speedy success/Data/Cleaned_data")
+all_trips <- read_csv("C:/Users/Felip/OneDrive/Escritorio/Freelancer/Portfolio/7. Case study Bike - Sahere navigate speedy success/Data/Cleaned_data/2019_all.csv")
+```
+
+### STEP 3: PREPARE DATA FOR ANALYSIS
+
+#### 3.1 Inspecting the dataset:
+
+**Column names**
+
+```{r}
+#List of column names
+colnames(all_trips)
+```
+
+We have a total of 19 columns in our data set.
+
+**Number of rows**
+
+```{r}
+#How many rows are in data frame?
+nrow(all_trips)
+```
+
+The data set have 3816317 corresponding to company trips during 2019.
+
+**First 6 rows**
+
+```{r}
+#See the first 6 rows of data frame.
+head(all_trips)
+```
+
+**Columns and data types**
+
+```{r}
+#See list of columns and data types (numeric, character, etc)
+str(all_trips)
+```
+
+**Statistic summary for each column**
+
+```{r}
+#Statistical summary of data. Mainly for numerics
+summary(all_trips)
+```
+
+here we can see some statistics for each column such as: Min, max, mean and mode values for each column.
+
+#### 3.2 Adding columns: date, month, day and year
+
+We will want to add some additional columns of data such as day, month , year. That provide additional opportunities to further analysis.
+
+```{r}
+all_trips$date <- as.Date(all_trips$start_time) #deafult format date is yyy-mm-dd
+all_trips$month <- format(as.Date(all_trips$date),"%m")
+all_trips$day <- format(as.Date(all_trips$date),"%d")
+all_trips$year <- format(as.Date(all_trips$date),"%Y")
+all_trips$day_week <- format(as.Date(all_trips$date),"%A")
+```
+
+#### 3.3 Add a "ride_length" calculation to all_trips (in seconds)
+
+```{r}
+all_trips$ride_length <- difftime(all_trips$end_time,all_trips$start_time)
+# Convert "ride_length" from Factor to numeric so we can run calculations on the data
+is.factor(all_trips$ride_length)
+all_trips$ride_length <- as.numeric(as.character(all_trips$ride_length))
+is.numeric(all_trips$ride_length)
+
+```
+
+#### 3.4 Remove "bad" data
+
+The data frame includes a few hundred entries when bikes were taken out of docks and checked for quality by Divvy or ride_length was negative \# We will create a new version of the data frame (v2) since data is being removed
+
+```{r}
+all_trips_v2 <- all_trips[!(all_trips$from_station_name == "HQ QR" | all_trips$ride_length<0),]
+```
+
+#### 3.5 Inspecting new data set
+
+```{r}
+summary(all_trips_v2)
+```
+
+Now , the negative values for ride_length column are deleted
+
+```{r}
+head(all_trips_v2)
+```
+
+### STEP 4: CONDUCT DESCRIPTIVE ANALYSIS
+
+#### 4.1 Descriptive analysis on ride_length
+
+```{r}
+summary(all_trips_v2$ride_length)
+```
+
+#### 4.2 Compare members and casual users
+
+Members appears in our data as *Subscriber* and casual users as *Customer*
+
+```{r}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$user_type, FUN = mean)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$user_type, FUN = median)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$user_type, FUN = max)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$user_type, FUN = min)
+```
+
+-   The average from casual members is higher than annual members. But let's see how many suscribers and how many casual members we have.
+
+```{r}
+# Calculate the count of records for each user type
+user_type_counts <- table(all_trips_v2$user_type)
+
+# Print the counts
+print(user_type_counts)
+```
+
+-   We have **2936930** annual members and **879374** casual members.
+
+-   The amount of annual members is 3.3 higher than casual members, but the avg ride length from casual members is 3.05 higher than annual members. For any reason casual members have longer trips than annual members.
+
+#### 4.3 See the average ride time by each day for members vs casual users
+
+```{r}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$user_type + all_trips_v2$day_week, FUN = mean)
+```
+
+The days of the week are out of order. let's fix that
+
+```{r}
+all_trips_v2$day_week <- ordered(all_trips_v2$day_week, levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$user_type + all_trips_v2$day_week, FUN = mean)
+
+```
+
+-   The avg of ride length for day also shows that the ride length of casual members is higher everyday of week.
+
+#### 4.4 Analyze ridership data by type and weekday
+
+```{r}
+all_trips_v2 %>% 
+  mutate(weekday = wday(start_time, label = TRUE)) %>%  #creates weekday field using wday()
+  group_by(user_type, weekday) %>%  #groups by user type and weekday
+  summarise(number_of_rides = n()							#calculates the number of rides and average duration 
+  ,average_duration = mean(ride_length)) %>% 		# calculates the average duration
+  arrange(user_type, weekday)								# sorts
+```
+
+#### 4.5 Let's visualize the number of rides by rider type
+
+```{r}
+all_trips_v2 %>%
+  mutate(weekday = wday(start_time, label = TRUE)) %>%
+  group_by(user_type, weekday) %>%
+  summarise(number_of_rides = n(),
+            average_duration = mean(ride_length)) %>%
+  arrange(user_type, weekday) %>%
+  ggplot(aes(x = weekday, y = number_of_rides, fill = user_type)) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label = number_of_rides), position = position_dodge(width = 0.9), vjust = -0.5, size=3) +
+  labs(y = "Number of Rides") +
+  theme_minimal()
+
+```
+
+-   The number of subscribers' trip is much larger than those who members.
+-   The number of rides for **Subscribers** increase for MON-FRI days and is lower in weekends.
+-   Casual members have the higher number of rides in weekends and this number decrease during MON-FRI days.
+
+#### Let's create a visualization for average duration
+
+```{r}
+all_trips_v2 %>%
+  mutate(weekday = wday(start_time, label = TRUE)) %>%
+  group_by(user_type, weekday) %>%
+  summarise(number_of_rides = n(),
+            average_duration = mean(ride_length)) %>%
+  arrange(user_type, weekday) %>%
+  ggplot(aes(x = weekday, y = average_duration, fill = user_type)) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label = round(average_duration, 2)), position = position_dodge(width = 0.9), vjust = -0.5, size=3) +
+  labs(y = "Average Duration") +
+  theme_minimal()
+```
+
+-   Subscriber average trip duration remain nearly constant throughout the week, with a slight increase on weekends.
+-   Casual members average trip duration is higher in weekend days.
+-   The average trip duration of casual members is higher than subscribers.
+
+## Conclusions
+
+**1. Membership Disparity:** Cyclistic has a significantly larger number of annual members (2,936,930) compared to casual riders (879,374). However, the average ride length for casual riders is substantially higher (3.05 times) than that of annual members. This suggests that casual riders tend to take longer trips when they use Cyclistic bikes.
+
+**2. Weekly Ride Patterns:** There are clear differences in the riding patterns between annual members and casual riders. Annual members tend to use the service more on weekdays, with a decrease in rides on weekends. Probably the annual members use as their primary mode of transportation to get to work
+
+In contrast, casual riders have higher ride numbers on weekends and fewer rides on weekdays.
+
+**3. Ride Duration:** The average trip duration of casual members is higher than subscribers. The average trip duration for casual riders is consistently higher on weekends compared to weekdays, indicating that they may use the bikes for leisure activities during weekends. Annual members, on the other hand, have a relatively constant average trip duration throughout the week.
+
+## Recommendations
+
+**1. Targeted Weekend Campaigns:** Given that casual riders have a strong presence on weekends and their rides tend to be longer, the marketing department could run targeted weekend campaigns to encourage more weekend riders to become annual members. Promotions and discounts specifically designed for weekend riders may be effective.
+
+**2. Member Conversion Strategy:** To convert casual riders into annual members, Cyclistic can highlight the benefits of becoming a member, such as cost savings for frequent riders, access to exclusive features, and priority bike availability during peak hours. These benefits should be communicated clearly through digital media and other marketing channels.
+
+**3. Customer Engagement:** Cyclistic should focus on engaging casual riders through digital media. This engagement can include providing them with valuable content, such as biking tips, local biking routes, and information about Cyclistic's services. Engaging content can create a sense of community and loyalty among casual riders, making them more likely to consider an annual membership.
+
+**4. Weekday Promotions for Annual Members:** To maintain and attract more annual members, Cyclistic can offer weekday promotions or incentives, such as discounts on annual memberships, for those who frequently use the service during weekdays. This strategy can encourage annual members to use the service more during weekdays.
+
+**5. Data-Driven Decision Making:** Continuously monitor rider data to identify trends and adjust marketing strategies accordingly. A data-driven approach will help Cyclistic stay responsive to changing rider behavior and preferences.
+
+**6. User Experience Enhancement:** Ensure a seamless and user-friendly experience for both annual members and casual riders through the Cyclistic app or website. Make it easy for casual riders to explore the benefits of annual membership and facilitate the conversion process.
+
+**7. Feedback Mechanism:** Implement a feedback mechanism to gather insights from both annual members and casual riders. Understand their specific needs, preferences, and pain points to tailor marketing strategies and improve the overall customer experience.
